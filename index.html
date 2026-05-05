@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>เช็คชื่อนักศึกษา</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f0f4f8;
+      --surface: #ffffff;
+      --border: #dde3ea;
+      --border-strong: #b8c2cc;
+      --text-primary: #1a2332;
+      --text-secondary: #5a6a7a;
+      --text-muted: #98a8b8;
+      --accent: #1a56db;
+      --accent-hover: #1447c0;
+      --accent-light: #ebf1ff;
+      --warn: #b45309;
+      --warn-light: #fffbeb;
+      --success: #065f46;
+      --success-light: #ecfdf5;
+      --error: #991b1b;
+      --error-light: #fef2f2;
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+
+    body {
+      font-family: 'Sarabun', sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+      color: var(--text-primary);
+    }
+
+    .page { max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 1rem; }
+
+    /* ===== SETTINGS BAR ===== */
+    .settings-bar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+    }
+    .settings-bar summary {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      user-select: none;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .settings-bar summary::before { content: '⚙'; }
+    .settings-bar[open] summary::before { content: '⚙'; }
+    .settings-content { margin-top: 1rem; display: flex; flex-direction: column; gap: 10px; }
+    .settings-content label { font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px; }
+    .settings-content input[type="text"], .settings-content input[type="url"] {
+      width: 100%; padding: 9px 12px; font-size: 13px; font-family: 'IBM Plex Mono', monospace;
+      border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+      background: var(--bg); color: var(--text-primary); outline: none;
+      transition: border-color 0.15s;
+    }
+    .settings-content input:focus { border-color: var(--accent); }
+    .btn-save-settings {
+      padding: 8px 16px; font-family: 'Sarabun', sans-serif; font-size: 13px;
+      font-weight: 500; border-radius: var(--radius-sm); border: none;
+      background: var(--accent); color: #fff; cursor: pointer; align-self: flex-start;
+      transition: background 0.15s;
+    }
+    .btn-save-settings:hover { background: var(--accent-hover); }
+
+    /* ===== HEADER ===== */
+    .header { text-align: center; padding: 0.5rem 0; }
+    .header h1 { font-size: 22px; font-weight: 600; }
+    .header .subtitle { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+    .api-status {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; margin-top: 8px; padding: 4px 10px;
+      border-radius: 20px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--text-muted);
+    }
+    .api-status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); }
+    .api-status.connected { color: var(--success); border-color: #a7f3d0; background: var(--success-light); }
+    .api-status.connected .dot { background: var(--success); }
+    .api-status.error { color: var(--error); border-color: #fecaca; background: var(--error-light); }
+    .api-status.error .dot { background: var(--error); }
+
+    /* ===== CARD ===== */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+    }
+
+    /* ===== INPUT ===== */
+    .field-label { font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; display: block; }
+    input#numInput {
+      width: 100%; font-family: 'IBM Plex Mono', monospace; font-size: 22px;
+      letter-spacing: 5px; text-align: center; padding: 14px 16px;
+      border: 1.5px solid var(--border-strong); border-radius: var(--radius-sm);
+      background: var(--bg); color: var(--text-primary); outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    input#numInput:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(26,86,219,0.1);
+    }
+    input#numInput::placeholder { color: var(--text-muted); letter-spacing: 3px; }
+
+    .progress-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+    .dots { display: flex; gap: 4px; }
+    .dot-item {
+      width: 9px; height: 9px; border-radius: 50%;
+      border: 1.5px solid var(--border-strong); background: transparent;
+      transition: background 0.1s, border-color 0.1s;
+    }
+    .dot-item.filled { background: var(--accent); border-color: var(--accent); }
+    .count-lbl { font-size: 12px; color: var(--text-muted); margin-left: auto; font-family: 'IBM Plex Mono', monospace; }
+
+    .msg { font-size: 13px; min-height: 18px; margin-top: 8px; }
+    .msg.ok { color: var(--success); }
+    .msg.warn { color: var(--warn); }
+    .msg.muted { color: var(--text-secondary); }
+    .msg.err { color: var(--error); }
+
+    /* ===== SUBMIT BUTTON ===== */
+    .btn-submit {
+      width: 100%; margin-top: 1.25rem; padding: 13px;
+      font-family: 'Sarabun', sans-serif; font-size: 15px; font-weight: 500;
+      border-radius: var(--radius-sm); border: none;
+      background: var(--accent); color: #fff; cursor: pointer;
+      transition: opacity 0.15s, background 0.15s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-submit:disabled { background: var(--border-strong); color: var(--text-muted); cursor: not-allowed; }
+    .btn-submit:not(:disabled):hover { background: var(--accent-hover); }
+    .spinner {
+      width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ===== TOAST ===== */
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+      background: var(--text-primary); color: #fff; font-size: 14px;
+      padding: 10px 20px; border-radius: 24px; opacity: 0;
+      transition: all 0.3s ease; z-index: 999; white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    .toast.success { background: var(--success); }
+    .toast.error { background: var(--error); }
+
+    /* ===== RECORDS ===== */
+    .section-header {
+      display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px;
+    }
+    .section-header span { font-size: 13px; color: var(--text-secondary); }
+    .section-header .total { font-size: 12px; color: var(--text-muted); font-family: 'IBM Plex Mono', monospace; }
+
+    .record-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 11px 14px; background: var(--bg); border-radius: var(--radius-sm);
+      margin-bottom: 6px; border: 1px solid transparent;
+    }
+    .record-item.dup { border-color: #fcd34d; }
+    .record-id { font-family: 'IBM Plex Mono', monospace; font-size: 15px; letter-spacing: 2px; }
+    .record-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .badge {
+      font-size: 12px; font-weight: 500; padding: 3px 10px; border-radius: 20px;
+    }
+    .badge.once { background: var(--success-light); color: var(--success); }
+    .badge.dup { background: var(--warn-light); color: var(--warn); }
+
+    .divider { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
+
+    .export-row { display: flex; gap: 8px; }
+    .btn-export {
+      flex: 1; padding: 9px; font-family: 'Sarabun', sans-serif; font-size: 13px;
+      border-radius: var(--radius-sm); border: 1px solid var(--border-strong);
+      background: var(--surface); color: var(--text-primary); cursor: pointer;
+      transition: background 0.12s;
+    }
+    .btn-export:hover { background: var(--bg); }
+
+    /* ===== QR SECTION ===== */
+    .qr-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.5rem; text-align: center;
+    }
+    .qr-card h2 { font-size: 15px; font-weight: 500; margin-bottom: 6px; }
+    .qr-card p { font-size: 12px; color: var(--text-secondary); margin-bottom: 1rem; }
+    #qrCode img { border-radius: 8px; }
+    .qr-url {
+      font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text-muted);
+      word-break: break-all; margin-top: 10px;
+    }
+    .qr-placeholder {
+      width: 160px; height: 160px; margin: 0 auto;
+      border: 2px dashed var(--border-strong); border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-muted); font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- SETTINGS -->
+  <details class="settings-bar" id="settingsPanel">
+    <summary>ตั้งค่าการเชื่อมต่อ</summary>
+    <div class="settings-content">
+      <div>
+        <label>Google Apps Script URL</label>
+        <input type="url" id="apiUrlInput" placeholder="https://script.google.com/macros/s/..." />
+      </div>
+      <div>
+        <label>URL ของหน้านี้ (สำหรับสร้าง QR Code)</label>
+        <input type="text" id="pageUrlInput" placeholder="https://yourname.github.io/student.html" />
+      </div>
+      <button class="btn-save-settings" onclick="saveSettings()">บันทึกการตั้งค่า</button>
+    </div>
+  </details>
+
+  <!-- HEADER -->
+  <div class="header">
+    <h1>เช็คชื่อนักศึกษา</h1>
+    <p class="subtitle">กรอกรหัสนักศึกษา 11 หลัก</p>
+    <div class="api-status" id="apiStatus">
+      <div class="dot"></div>
+      <span id="apiStatusText">ยังไม่ได้ตั้งค่า API</span>
+    </div>
+  </div>
+
+  <!-- INPUT FORM -->
+  <div class="card">
+    <label class="field-label" for="numInput">รหัสนักศึกษา (11 หลัก)</label>
+    <input type="text" id="numInput" inputmode="numeric" maxlength="11" placeholder="00000000000" autocomplete="off" />
+
+    <div class="progress-row">
+      <div class="dots" id="dots"></div>
+      <span class="count-lbl" id="counter">0 / 11</span>
+    </div>
+
+    <div class="msg muted" id="statusMsg"></div>
+    <div class="msg warn" id="dupMsg"></div>
+
+    <button class="btn-submit" id="submitBtn" disabled>
+      <div class="spinner" id="spinner"></div>
+      <span id="btnText">บันทึก</span>
+    </button>
+  </div>
+
+  <!-- RECORDS -->
+  <div class="card" id="listCard" style="display:none;">
+    <div class="section-header">
+      <span>รายการรหัสนักศึกษา</span>
+      <span class="total" id="totalLabel"></span>
+    </div>
+    <div id="recordList"></div>
+    <hr class="divider" />
+    <div class="export-row">
+      <button class="btn-export" onclick="exportSummary()">⬇ ส่งออกสรุป (.xlsx)</button>
+      <button class="btn-export" onclick="exportLog()">⬇ ส่งออกประวัติ (.xlsx)</button>
+    </div>
+  </div>
+
+  <!-- QR CODE -->
+  <div class="qr-card" id="qrSection" style="display:none;">
+    <h2>QR Code สำหรับสแกน</h2>
+    <p>นักศึกษาสแกน QR นี้เพื่อเปิดหน้ากรอกข้อมูล</p>
+    <div id="qrCode"><div class="qr-placeholder">ใส่ URL ในการตั้งค่า<br>เพื่อสร้าง QR</div></div>
+    <div class="qr-url" id="qrUrl"></div>
+  </div>
+
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+  // ========== STATE ==========
+  let API_URL = localStorage.getItem('apiUrl') || '';
+  let PAGE_URL = localStorage.getItem('pageUrl') || '';
+  const records = {};
+  const log = [];
+
+  // ========== INIT ==========
+  document.getElementById('apiUrlInput').value = API_URL;
+  document.getElementById('pageUrlInput').value = PAGE_URL;
+  updateApiStatus();
+  renderDots(0);
+  if (PAGE_URL) generateQR(PAGE_URL);
+
+  // ========== SETTINGS ==========
+  function saveSettings() {
+    API_URL = document.getElementById('apiUrlInput').value.trim();
+    PAGE_URL = document.getElementById('pageUrlInput').value.trim();
+    localStorage.setItem('apiUrl', API_URL);
+    localStorage.setItem('pageUrl', PAGE_URL);
+    updateApiStatus();
+    if (PAGE_URL) generateQR(PAGE_URL);
+    document.getElementById('settingsPanel').removeAttribute('open');
+    showToast('บันทึกการตั้งค่าแล้ว', 'success');
+  }
+
+  function updateApiStatus() {
+    const el = document.getElementById('apiStatus');
+    const txt = document.getElementById('apiStatusText');
+    if (API_URL && API_URL.includes('script.google.com')) {
+      el.className = 'api-status connected';
+      txt.textContent = 'เชื่อมต่อ Google Sheets';
+    } else if (API_URL) {
+      el.className = 'api-status error';
+      txt.textContent = 'URL ไม่ถูกต้อง';
+    } else {
+      el.className = 'api-status';
+      txt.textContent = 'ยังไม่ได้ตั้งค่า API';
+    }
+  }
+
+  // ========== QR CODE ==========
+  function generateQR(url) {
+    const qrDiv = document.getElementById('qrCode');
+    const urlDiv = document.getElementById('qrUrl');
+    document.getElementById('qrSection').style.display = 'block';
+    const encoded = encodeURIComponent(url);
+    qrDiv.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encoded}" width="160" height="160" alt="QR Code" />`;
+    urlDiv.textContent = url;
+  }
+
+  // ========== INPUT ==========
+  const input = document.getElementById('numInput');
+  const counter = document.getElementById('counter');
+  const dotsEl = document.getElementById('dots');
+  const statusMsg = document.getElementById('statusMsg');
+  const dupMsg = document.getElementById('dupMsg');
+  const submitBtn = document.getElementById('submitBtn');
+
+  function renderDots(len) {
+    dotsEl.innerHTML = '';
+    for (let i = 0; i < 11; i++) {
+      const d = document.createElement('div');
+      d.className = 'dot-item' + (i < len ? ' filled' : '');
+      dotsEl.appendChild(d);
+    }
+  }
+
+  input.addEventListener('input', () => {
+    const raw = input.value.replace(/\D/g, '').slice(0, 11);
+    input.value = raw;
+    const len = raw.length;
+    counter.textContent = `${len} / 11`;
+    renderDots(len);
+    if (len === 0) {
+      statusMsg.textContent = ''; dupMsg.textContent = ''; setBtn(false);
+    } else if (len < 11) {
+      statusMsg.className = 'msg muted';
+      statusMsg.textContent = `ต้องการอีก ${11 - len} หลัก`;
+      dupMsg.textContent = ''; setBtn(false);
+    } else {
+      statusMsg.className = 'msg ok';
+      statusMsg.textContent = '✓ ครบ 11 หลักแล้ว';
+      dupMsg.textContent = records[raw] ? `⚠ รหัสนี้เคยกรอกแล้ว ${records[raw].count} ครั้ง` : '';
+      setBtn(true);
+    }
+  });
+
+  function setBtn(ok) {
+    submitBtn.disabled = !ok;
+  }
+
+  // ========== SUBMIT ==========
+  submitBtn.addEventListener('click', async () => {
+    const val = input.value;
+    if (val.length !== 11) return;
+
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const dateStr = now.toLocaleDateString('th-TH', { year: 'numeric', month: '2-digit', day: '2-digit' });
+
+    // อัปเดต local records
+    if (records[val]) {
+      records[val].count += 1; records[val].lastTime = timeStr; records[val].lastDate = dateStr;
+    } else {
+      records[val] = { count: 1, lastTime: timeStr, lastDate: dateStr };
+    }
+    log.push({ id: val, date: dateStr, time: timeStr });
+
+    // ส่งไป Google Sheets ถ้ามี API
+    if (API_URL && API_URL.includes('script.google.com')) {
+      setLoading(true);
+      try {
+        await fetch(API_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studentId: val, date: dateStr, time: timeStr })
+        });
+        showToast('บันทึกลง Google Sheets แล้ว ✓', 'success');
+      } catch (err) {
+        showToast('ส่งข้อมูลไม่สำเร็จ — บันทึกเฉพาะในเครื่อง', 'error');
+      }
+      setLoading(false);
+    } else {
+      showToast('บันทึกแล้ว (ยังไม่ได้เชื่อม Sheets)', '');
+    }
+
+    input.value = ''; renderDots(0);
+    counter.textContent = '0 / 11';
+    statusMsg.textContent = ''; dupMsg.textContent = '';
+    setBtn(false);
+    renderRecords();
+  });
+
+  function setLoading(on) {
+    submitBtn.disabled = on;
+    document.getElementById('spinner').style.display = on ? 'block' : 'none';
+    document.getElementById('btnText').textContent = on ? 'กำลังบันทึก...' : 'บันทึก';
+  }
+
+  // ========== RECORDS ==========
+  function renderRecords() {
+    const sorted = Object.entries(records).sort((a, b) => b[1].count - a[1].count);
+    const total = sorted.reduce((s, [, v]) => s + v.count, 0);
+    const listCard = document.getElementById('listCard');
+    listCard.style.display = 'block';
+    document.getElementById('totalLabel').textContent = `รวม ${total} ครั้ง`;
+    document.getElementById('recordList').innerHTML = sorted.map(([id, info]) => {
+      const isDup = info.count > 1;
+      return `<div class="record-item ${isDup ? 'dup' : ''}">
+        <div>
+          <div class="record-id">${id}</div>
+          <div class="record-meta">${info.lastDate} · ${info.lastTime}</div>
+        </div>
+        <span class="badge ${isDup ? 'dup' : 'once'}">${info.count} ครั้ง</span>
+      </div>`;
+    }).join('');
+  }
+
+  // ========== EXPORT ==========
+  function exportSummary() {
+    const sorted = Object.entries(records).sort((a, b) => b[1].count - a[1].count);
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['รหัสนักศึกษา', 'จำนวนครั้งที่กรอก', 'วันที่ล่าสุด', 'เวลาล่าสุด'],
+      ...sorted.map(([id, info]) => [id, info.count, info.lastDate, info.lastTime])
+    ]);
+    ws['!cols'] = [{ wch: 16 }, { wch: 18 }, { wch: 14 }, { wch: 12 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'สรุปรหัสนักศึกษา');
+    XLSX.writeFile(wb, 'student_summary.xlsx');
+  }
+
+  function exportLog() {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['ลำดับ', 'รหัสนักศึกษา', 'วันที่', 'เวลา'],
+      ...log.map((r, i) => [i + 1, r.id, r.date, r.time])
+    ]);
+    ws['!cols'] = [{ wch: 8 }, { wch: 16 }, { wch: 14 }, { wch: 12 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'ประวัติการกรอก');
+    XLSX.writeFile(wb, 'student_log.xlsx');
+  }
+
+  // ========== TOAST ==========
+  function showToast(msg, type) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast ' + (type || '');
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+</script>
+</body>
+</html>
