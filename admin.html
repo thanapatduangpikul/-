@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — ข้อมูลเช็คชื่อ</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Sarabun', sans-serif;
+      background: #f7f6f3;
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+      color: #111;
+    }
+
+    .page { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.25rem; }
+
+    h1 { font-size: 22px; font-weight: 600; }
+    .sub { font-size: 13px; color: #999; margin-top: 2px; }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 1px 12px rgba(0,0,0,0.06);
+    }
+
+    .setting-label { font-size: 12px; font-weight: 500; color: #555; letter-spacing: 0.5px; display: block; margin-bottom: 6px; }
+    input[type="url"], input[type="text"] {
+      width: 100%; padding: 10px 14px; font-size: 13px;
+      font-family: 'IBM Plex Mono', monospace;
+      border: 1.5px solid #e8e8e8; border-radius: 10px;
+      background: #fafafa; color: #111; outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus { border-color: #111; }
+
+    .btn-save {
+      margin-top: 10px;
+      padding: 9px 20px; font-family: 'Sarabun', sans-serif;
+      font-size: 13px; font-weight: 500;
+      border-radius: 10px; border: none;
+      background: #111; color: #fff; cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn-save:hover { opacity: 0.8; }
+
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; padding: 4px 12px;
+      border-radius: 20px; margin-top: 10px;
+      background: #f3f4f6; color: #888;
+    }
+    .status-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: #ccc; }
+    .status-pill.ok { background: #f0fdf4; color: #166534; }
+    .status-pill.ok .dot { background: #22c55e; }
+
+    .stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 1rem; }
+    .stat-box { background: #f7f6f3; border-radius: 12px; padding: 14px; text-align: center; }
+    .stat-num { font-size: 24px; font-weight: 600; }
+    .stat-lbl { font-size: 12px; color: #999; margin-top: 2px; }
+
+    .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .section-head span { font-size: 14px; font-weight: 500; }
+
+    .export-row { display: flex; gap: 8px; }
+    .btn-export {
+      flex: 1; padding: 9px; font-family: 'Sarabun', sans-serif; font-size: 13px;
+      border-radius: 10px; border: 1.5px solid #e8e8e8;
+      background: #fff; color: #111; cursor: pointer; transition: background 0.12s;
+    }
+    .btn-export:hover { background: #f7f6f3; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th { font-size: 12px; font-weight: 500; color: #999; text-align: left; padding: 6px 0 10px; border-bottom: 1px solid #f0f0f0; }
+    td { font-size: 13px; padding: 10px 0; border-bottom: 1px solid #f7f6f3; vertical-align: middle; }
+    td:last-child { text-align: right; }
+    .id-cell { font-family: 'IBM Plex Mono', monospace; letter-spacing: 1px; }
+    .meta-cell { font-size: 11px; color: #bbb; }
+    .badge {
+      font-size: 11px; font-weight: 500; padding: 3px 10px;
+      border-radius: 20px; display: inline-block;
+    }
+    .badge.once { background: #f0fdf4; color: #166534; }
+    .badge.dup  { background: #fffbeb; color: #92400e; }
+
+    .empty { text-align: center; padding: 2rem; font-size: 13px; color: #bbb; }
+    .fetch-btn {
+      width: 100%; padding: 11px; font-family: 'Sarabun', sans-serif;
+      font-size: 14px; font-weight: 500;
+      border-radius: 10px; border: none;
+      background: #111; color: #fff; cursor: pointer;
+      transition: opacity 0.15s; margin-top: 4px;
+    }
+    .fetch-btn:hover { opacity: 0.8; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div>
+    <h1>ข้อมูลเช็คชื่อ</h1>
+    <p class="sub">หน้านี้สำหรับอาจารย์ — ไม่ต้องแชร์ให้นักศึกษา</p>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="card">
+    <label class="setting-label">Google Apps Script URL</label>
+    <input type="url" id="apiUrl" placeholder="https://script.google.com/macros/s/..." />
+    <br/>
+    <button class="btn-save" onclick="saveApi()">บันทึก</button>
+    <div class="status-pill" id="statusPill">
+      <div class="dot"></div>
+      <span id="statusText">ยังไม่ได้ตั้งค่า</span>
+    </div>
+  </div>
+
+  <!-- FETCH + STATS -->
+  <div class="card">
+    <div class="stats-row">
+      <div class="stat-box">
+        <div class="stat-num" id="statTotal">—</div>
+        <div class="stat-lbl">ครั้งทั้งหมด</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="statUniq">—</div>
+        <div class="stat-lbl">คนไม่ซ้ำ</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="statDup">—</div>
+        <div class="stat-lbl">เช็คซ้ำ</div>
+      </div>
+    </div>
+    <button class="fetch-btn" onclick="fetchData()">ดึงข้อมูลจาก Google Sheets</button>
+  </div>
+
+  <!-- TABLE -->
+  <div class="card" id="tableCard" style="display:none;">
+    <div class="section-head">
+      <span>รายการนักศึกษา</span>
+    </div>
+    <div id="tableWrap"></div>
+    <br/>
+    <div class="export-row">
+      <button class="btn-export" onclick="exportSummary()">⬇ ส่งออกสรุป (.xlsx)</button>
+      <button class="btn-export" onclick="exportLog()">⬇ ส่งออกประวัติทั้งหมด (.xlsx)</button>
+    </div>
+  </div>
+
+</div>
+<script>
+  let API_URL = localStorage.getItem('adminApiUrl') || '';
+  let allData = [];
+  let logData = [];
+
+  document.getElementById('apiUrl').value = API_URL;
+  updateStatus();
+
+  function saveApi() {
+    API_URL = document.getElementById('apiUrl').value.trim();
+    localStorage.setItem('adminApiUrl', API_URL);
+    updateStatus();
+  }
+
+  function updateStatus() {
+    const pill = document.getElementById('statusPill');
+    const txt = document.getElementById('statusText');
+    if (API_URL && API_URL.includes('script.google.com')) {
+      pill.className = 'status-pill ok';
+      txt.textContent = 'เชื่อมต่อแล้ว';
+    } else {
+      pill.className = 'status-pill';
+      txt.textContent = 'ยังไม่ได้ตั้งค่า';
+    }
+  }
+
+  async function fetchData() {
+    if (!API_URL || !API_URL.includes('script.google.com')) {
+      alert('กรุณาใส่ Apps Script URL ก่อนครับ'); return;
+    }
+    try {
+      const res = await fetch(API_URL + '?action=getData');
+      const json = await res.json();
+      if (json.data) {
+        processData(json.data);
+      } else {
+        alert('ไม่มีข้อมูล หรือ API ยังไม่รองรับการดึงข้อมูล');
+      }
+    } catch(e) {
+      alert('ดึงข้อมูลไม่สำเร็จ: ' + e.message);
+    }
+  }
+
+  function processData(rows) {
+    // rows = [[studentId, date, time, count], ...]
+    logData = rows;
+    const map = {};
+    rows.forEach(r => {
+      const id = r[0];
+      if (!map[id]) map[id] = { count: r[3], lastDate: r[1], lastTime: r[2] };
+      else { map[id].count = r[3]; map[id].lastDate = r[1]; map[id].lastTime = r[2]; }
+    });
+    allData = Object.entries(map).sort((a,b) => b[1].count - a[1].count);
+    const total = allData.reduce((s,[,v]) => s + v.count, 0);
+    const dups = allData.filter(([,v]) => v.count > 1).length;
+    document.getElementById('statTotal').textContent = total;
+    document.getElementById('statUniq').textContent = allData.length;
+    document.getElementById('statDup').textContent = dups;
+    renderTable();
+  }
+
+  function renderTable() {
+    document.getElementById('tableCard').style.display = 'block';
+    if (allData.length === 0) {
+      document.getElementById('tableWrap').innerHTML = '<div class="empty">ยังไม่มีข้อมูล</div>';
+      return;
+    }
+    document.getElementById('tableWrap').innerHTML = `
+      <table>
+        <thead><tr>
+          <th>รหัสนักศึกษา</th>
+          <th>ล่าสุด</th>
+          <th>จำนวนครั้ง</th>
+        </tr></thead>
+        <tbody>
+          ${allData.map(([id, info]) => `
+            <tr>
+              <td class="id-cell">${id}</td>
+              <td class="meta-cell">${info.lastDate}<br>${info.lastTime}</td>
+              <td><span class="badge ${info.count > 1 ? 'dup' : 'once'}">${info.count} ครั้ง</span></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  function exportSummary() {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['รหัสนักศึกษา', 'จำนวนครั้ง', 'วันที่ล่าสุด', 'เวลาล่าสุด'],
+      ...allData.map(([id, info]) => [id, info.count, info.lastDate, info.lastTime])
+    ]);
+    ws['!cols'] = [{wch:16},{wch:12},{wch:14},{wch:12}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'สรุป');
+    XLSX.writeFile(wb, 'student_summary.xlsx');
+  }
+
+  function exportLog() {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['รหัสนักศึกษา', 'วันที่', 'เวลา', 'จำนวนครั้งสะสม'],
+      ...logData.map(r => [r[0], r[1], r[2], r[3]])
+    ]);
+    ws['!cols'] = [{wch:16},{wch:14},{wch:12},{wch:16}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'ประวัติ');
+    XLSX.writeFile(wb, 'student_log.xlsx');
+  }
+</script>
+</body>
+</html>
